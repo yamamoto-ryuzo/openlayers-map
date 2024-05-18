@@ -97,9 +97,10 @@
       map = new ol.Map({
         target: 'map',
         layers: [baseMap],
+        <!--地図のセンターとズームレベル-->
         view: new ol.View({
           center: ol.proj.fromLonLat([139.76188075270883,35.677979184581716]),
-          zoom: 8
+          zoom: 18
         })
       });
     }
