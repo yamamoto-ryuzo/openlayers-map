@@ -88,6 +88,5 @@ function loadGeoJsonFromUrl(url) {
 
 // ページロード時に /data/sample.geojson を表示
 window.addEventListener('DOMContentLoaded', function() {
-  // GitHub Pages用の絶対パスに修正
   loadGeoJsonFromUrl('https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson');
 });
