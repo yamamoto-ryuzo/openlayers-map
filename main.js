@@ -51,9 +51,8 @@ const pointStyle = new ol.style.Style({
   })
 });
 
-// /data/sample.geojson を読み込んで表示
+// GeoJSON表示
 function loadGeoJsonFromUrl(url) {
-  console.log('GeoJSON取得URL:', url);
   fetch(url)
     .then(response => {
       if (!response.ok) throw new Error('ファイル取得失敗: ' + response.status + ' ' + response.statusText);
@@ -77,11 +76,10 @@ function loadGeoJsonFromUrl(url) {
       });
       map.addLayer(vectorLayer);
 
-      // 属性表示イベント
+      // 属性表示イベント（クリックしたフィーチャの属性を表示）
       map.on('singleclick', function(evt) {
         map.forEachFeatureAtPixel(evt.pixel, function(feature) {
           const props = feature.getProperties();
-          // geometry以外の属性のみ表示
           const attr = Object.assign({}, props);
           delete attr.geometry;
           alert('属性:\n' + JSON.stringify(attr, null, 2));
