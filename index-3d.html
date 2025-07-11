@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Cesium 3D GeoJSON Viewer</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    #cesiumContainer { width: 100%; height: 100vh; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Cesium 3D GeoJSON Viewer</h1>
+  <div id="cesiumContainer"></div>
+  <script>
+    // Cesium初期化
+    Cesium.Ion.defaultAccessToken = '';
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      terrainProvider: Cesium.createWorldTerrain()
+    });
+
+    // GeoJSONロード
+    const geojsonUrl = 'https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson';
+    Cesium.GeoJsonDataSource.load(geojsonUrl, {
+      clampToGround: true
+    }).then(function(dataSource) {
+      viewer.dataSources.add(dataSource);
+      viewer.zoomTo(dataSource);
+    }).catch(function(error) {
+      alert('GeoJSONの取得または表示に失敗しました: ' + error);
+      console.error(error);
+    });
+  </script>
+</body>
+</html>
