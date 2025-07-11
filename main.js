@@ -55,7 +55,7 @@ const redCircleStyle = new ol.style.Style({
 function loadGeoJsonFromUrl(url) {
   fetch(url)
     .then(response => {
-      if (!response.ok) throw new Error('ファイル取得失敗');
+      if (!response.ok) throw new Error('ファイル取得失敗: ' + response.status + ' ' + response.statusText);
       return response.json();
     })
     .then(geojson => {
@@ -82,10 +82,12 @@ function loadGeoJsonFromUrl(url) {
     })
     .catch(err => {
       alert('GeoJSONの取得または表示に失敗しました: ' + err.message);
+      console.error('GeoJSONロードエラー:', err);
     });
 }
 
 // ページロード時に /data/sample.geojson を表示
 window.addEventListener('DOMContentLoaded', function() {
-  loadGeoJsonFromUrl('/data/sample.geojson');
+  // GitHub Pages用の絶対パスに修正
+  loadGeoJsonFromUrl('https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson');
 });
