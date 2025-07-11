@@ -25,7 +25,23 @@ const map = new Map({
   })
 });
 
-// 赤い円スタイル
+let currentVectorLayer = null;
+
+// ベクターレイヤーを地図に追加（既存レイヤーは削除）
+function addVectorLayer(vectorSource, style) {
+  if (currentVectorLayer) {
+    map.removeLayer(currentVectorLayer);
+  }
+  currentVectorLayer = new VectorLayer({
+    source: vectorSource,
+    style: style
+  });
+  map.addLayer(currentVectorLayer);
+  const extent = vectorSource.getExtent();
+  map.getView().fit(extent, { duration: 1000 });
+}
+
+// 赤いマーク（円）スタイル
 const redPointStyle = new Style({
   image: new Circle({
     radius: 8,
@@ -34,23 +50,53 @@ const redPointStyle = new Style({
   })
 });
 
-// sample.geojsonを読み込んで表示
-fetch('/data/sample.geojson')
-  .then(response => response.json())
-  .then(geojson => {
-    const vectorSource = new VectorSource({
-      features: new GeoJSON().readFeatures(geojson, {
-        featureProjection: map.getView().getProjection()
-      })
+// ファイル選択でGeoJSON表示
+document.getElementById('gisFileInput').addEventListener('change', function (event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // gpkgファイルの場合は警告
+  if (file.name.toLowerCase().endsWith('.gpkg')) {
+    alert('GeoPackage（.gpkg）ファイルは直接表示できません。GeoJSONなどに変換してください。');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const geojson = JSON.parse(e.target.result);
+      const vectorSource = new VectorSource({
+        features: new GeoJSON().readFeatures(geojson, {
+          featureProjection: map.getView().getProjection()
+        })
+      });
+      addVectorLayer(vectorSource, redPointStyle);
+    } catch (err) {
+      alert('ファイルの読み込みに失敗しました。GeoJSON形式のファイルを選択してください。');
+    }
+  };
+  reader.readAsText(file);
+});
+
+// GeoJSONファイルをURLから読み込む関数
+function loadGeoJSONFromUrl(url) {
+  fetch(url)
+    .then(response => {
+      if (!response.ok) throw new Error('ファイルが見つかりません');
+      return response.json();
+    })
+    .then(geojson => {
+      const vectorSource = new VectorSource({
+        features: new GeoJSON().readFeatures(geojson, {
+          featureProjection: map.getView().getProjection()
+        })
+      });
+      addVectorLayer(vectorSource, redPointStyle);
+    })
+    .catch(err => {
+      alert('GeoJSONファイルの読み込みに失敗しました: ' + err.message);
     });
-    const vectorLayer = new VectorLayer({
-      source: vectorSource,
-      style: redPointStyle
-    });
-    map.addLayer(vectorLayer);
-    const extent = vectorSource.getExtent();
-    map.getView().fit(extent, { duration: 1000 });
-  })
-  .catch(err => {
-    alert('GeoJSONファイルの読み込みに失敗しました: ' + err.message);
-  });
+}
+
+// 例: サーバー上のGeoJSONファイルを表示（初期表示でsample.geojsonにズーム）
+loadGeoJSONFromUrl('/data/sample.geojson');
