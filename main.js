@@ -42,11 +42,11 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
   reader.readAsText(file);
 });
 
-// 赤い丸のスタイル
-const redCircleStyle = new ol.style.Style({
+// 一般的な青色ポイントスタイル
+const pointStyle = new ol.style.Style({
   image: new ol.style.Circle({
-    radius: 8,
-    fill: new ol.style.Fill({ color: 'red' }),
+    radius: 6,
+    fill: new ol.style.Fill({ color: 'blue' }),
     stroke: new ol.style.Stroke({ color: 'white', width: 2 })
   })
 });
@@ -69,18 +69,24 @@ function loadGeoJsonFromUrl(url) {
         source: vectorSource,
         style: function(feature) {
           if (feature.getGeometry().getType() === 'Point') {
-            return new ol.style.Style({
-              image: new ol.style.Circle({
-                radius: 8,
-                fill: new ol.style.Fill({ color: 'red' }),
-                stroke: new ol.style.Stroke({ color: 'white', width: 2 })
-              })
-            });
+            return pointStyle;
           }
+          // ライン・ポリゴンはデフォルト
           return null;
         }
       });
       map.addLayer(vectorLayer);
+
+      // 属性表示イベント
+      map.on('singleclick', function(evt) {
+        map.forEachFeatureAtPixel(evt.pixel, function(feature) {
+          const props = feature.getProperties();
+          // geometry以外の属性のみ表示
+          const attr = Object.assign({}, props);
+          delete attr.geometry;
+          alert('属性:\n' + JSON.stringify(attr, null, 2));
+        });
+      });
 
       const extent = vectorSource.getExtent();
       if (!ol.extent.isEmpty(extent)) {
