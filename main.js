@@ -95,13 +95,8 @@ function loadGeoJsonFromUrl(url) {
 
 // GitHub Pages対応: 正しいパスを自動生成
 function getGeoJsonUrl() {
-  // GitHub Pagesの場合
-  if (location.hostname.endsWith('github.io')) {
-    const repoPath = location.pathname.split('/').slice(0, 3).join('/');
-    return location.origin + repoPath + '/data/sample.geojson';
-  }
-  // ローカルの場合
-  return '/data/sample.geojson';
+  // GitHub Pages用の絶対パスを返す
+  return 'https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson';
 }
 
 window.addEventListener('DOMContentLoaded', function() {
