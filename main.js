@@ -86,7 +86,13 @@ function loadGeoJsonFromUrl(url) {
     });
 }
 
+function getGeoJsonUrl() {
+  // GitHub Pagesの場合はリポジトリ名を含めたパスにする
+  const basePath = location.pathname.replace(/\/[^\/]*$/, '');
+  return location.origin + basePath + '/data/sample.geojson';
+}
+
 // ページロード時に /data/sample.geojson を表示
 window.addEventListener('DOMContentLoaded', function() {
-  loadGeoJsonFromUrl('https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson');
+  loadGeoJsonFromUrl(getGeoJsonUrl());
 });

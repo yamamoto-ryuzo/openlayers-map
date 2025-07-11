@@ -1,5 +1,9 @@
 # OpenLayers GeoJSON Viewer
 
+## 公開URL
+
+[https://yamamoto-ryuzo.github.io/openlayers-map/](https://yamamoto-ryuzo.github.io/openlayers-map/)
+
 ## 概要
 OpenLayersを使って、GeoJSONファイルを地図上に表示するWebアプリです。  
 ローカルファイル選択でGeoJSONを読み込み、地図上に描画します。
