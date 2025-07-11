@@ -4,6 +4,11 @@
 
 [https://yamamoto-ryuzo.github.io/openlayers-map/](https://yamamoto-ryuzo.github.io/openlayers-map/)
 
+## サンプルGeoJSON表示
+
+初期表示で以下のGeoJSONファイルが地図上に表示されます。  
+[https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson](https://yamamoto-ryuzo.github.io/openlayers-map/data/sample.geojson)
+
 ## 概要
 OpenLayersを使って、GeoJSONファイルを地図上に表示するWebアプリです。  
 ローカルファイル選択でGeoJSONを読み込み、地図上に描画します。
