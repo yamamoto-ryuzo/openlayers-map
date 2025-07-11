@@ -53,6 +53,7 @@ const redCircleStyle = new ol.style.Style({
 
 // /data/sample.geojson を読み込んで表示
 function loadGeoJsonFromUrl(url) {
+  console.log('GeoJSON取得URL:', url);
   fetch(url)
     .then(response => {
       if (!response.ok) throw new Error('ファイル取得失敗: ' + response.status + ' ' + response.statusText);
@@ -68,7 +69,13 @@ function loadGeoJsonFromUrl(url) {
         source: vectorSource,
         style: function(feature) {
           if (feature.getGeometry().getType() === 'Point') {
-            return redCircleStyle;
+            return new ol.style.Style({
+              image: new ol.style.Circle({
+                radius: 8,
+                fill: new ol.style.Fill({ color: 'red' }),
+                stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+              })
+            });
           }
           return null;
         }
@@ -86,13 +93,17 @@ function loadGeoJsonFromUrl(url) {
     });
 }
 
+// GitHub Pages対応: 正しいパスを自動生成
 function getGeoJsonUrl() {
-  // GitHub Pagesの場合はリポジトリ名を含めたパスにする
-  const basePath = location.pathname.replace(/\/[^\/]*$/, '');
-  return location.origin + basePath + '/data/sample.geojson';
+  // GitHub Pagesの場合
+  if (location.hostname.endsWith('github.io')) {
+    const repoPath = location.pathname.split('/').slice(0, 3).join('/');
+    return location.origin + repoPath + '/data/sample.geojson';
+  }
+  // ローカルの場合
+  return '/data/sample.geojson';
 }
 
-// ページロード時に /data/sample.geojson を表示
 window.addEventListener('DOMContentLoaded', function() {
   loadGeoJsonFromUrl(getGeoJsonUrl());
 });
