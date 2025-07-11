@@ -11,7 +11,6 @@ import Circle from 'ol/style/Circle';
 import Fill from 'ol/style/Fill';
 import Stroke from 'ol/style/Stroke';
 
-// 地図の初期化
 const map = new Map({
   target: 'map',
   layers: [
@@ -27,7 +26,14 @@ const map = new Map({
 
 let currentVectorLayer = null;
 
-// ベクターレイヤーを地図に追加（既存レイヤーは削除）
+const redPointStyle = new Style({
+  image: new Circle({
+    radius: 8,
+    fill: new Fill({ color: 'red' }),
+    stroke: new Stroke({ color: 'white', width: 2 })
+  })
+});
+
 function addVectorLayer(vectorSource, style) {
   if (currentVectorLayer) {
     map.removeLayer(currentVectorLayer);
@@ -41,26 +47,37 @@ function addVectorLayer(vectorSource, style) {
   map.getView().fit(extent, { duration: 1000 });
 }
 
-// 赤いマーク（円）スタイル
-const redPointStyle = new Style({
-  image: new Circle({
-    radius: 8,
-    fill: new Fill({ color: 'red' }),
-    stroke: new Stroke({ color: 'white', width: 2 })
-  })
-});
+// デバッグ: GeoJSONファイルの読み込み状況をコンソールに表示
+function loadGeoJSONFromUrl(url) {
+  fetch(url)
+    .then(response => {
+      console.log('GeoJSON fetch response:', response);
+      if (!response.ok) throw new Error('ファイルが見つかりません');
+      return response.json();
+    })
+    .then(geojson => {
+      console.log('GeoJSON内容:', geojson);
+      const vectorSource = new VectorSource({
+        features: new GeoJSON().readFeatures(geojson, {
+          featureProjection: map.getView().getProjection()
+        })
+      });
+      addVectorLayer(vectorSource, redPointStyle);
+    })
+    .catch(err => {
+      alert('GeoJSONファイルの読み込みに失敗しました: ' + err.message);
+      console.error(err);
+    });
+}
 
 // ファイル選択でGeoJSON表示
 document.getElementById('gisFileInput').addEventListener('change', function (event) {
   const file = event.target.files[0];
   if (!file) return;
-
-  // gpkgファイルの場合は警告
   if (file.name.toLowerCase().endsWith('.gpkg')) {
     alert('GeoPackage（.gpkg）ファイルは直接表示できません。GeoJSONなどに変換してください。');
     return;
   }
-
   const reader = new FileReader();
   reader.onload = function (e) {
     try {
@@ -78,25 +95,5 @@ document.getElementById('gisFileInput').addEventListener('change', function (eve
   reader.readAsText(file);
 });
 
-// GeoJSONファイルをURLから読み込む関数
-function loadGeoJSONFromUrl(url) {
-  fetch(url)
-    .then(response => {
-      if (!response.ok) throw new Error('ファイルが見つかりません');
-      return response.json();
-    })
-    .then(geojson => {
-      const vectorSource = new VectorSource({
-        features: new GeoJSON().readFeatures(geojson, {
-          featureProjection: map.getView().getProjection()
-        })
-      });
-      addVectorLayer(vectorSource, redPointStyle);
-    })
-    .catch(err => {
-      alert('GeoJSONファイルの読み込みに失敗しました: ' + err.message);
-    });
-}
-
-// 例: サーバー上のGeoJSONファイルを表示（初期表示でsample.geojsonにズーム）
+// 初期表示でsample.geojsonをズームして表示
 loadGeoJSONFromUrl('/data/sample.geojson');
