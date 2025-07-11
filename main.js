@@ -41,3 +41,51 @@ document.getElementById('fileInput').addEventListener('change', function (e) {
   };
   reader.readAsText(file);
 });
+
+// 赤い丸のスタイル
+const redCircleStyle = new ol.style.Style({
+  image: new ol.style.Circle({
+    radius: 8,
+    fill: new ol.style.Fill({ color: 'red' }),
+    stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+  })
+});
+
+// /data/sample.geojson を読み込んで表示
+function loadGeoJsonFromUrl(url) {
+  fetch(url)
+    .then(response => {
+      if (!response.ok) throw new Error('ファイル取得失敗');
+      return response.json();
+    })
+    .then(geojson => {
+      const vectorSource = new ol.source.Vector({
+        features: new ol.format.GeoJSON().readFeatures(geojson, {
+          featureProjection: map.getView().getProjection()
+        })
+      });
+      const vectorLayer = new ol.layer.Vector({
+        source: vectorSource,
+        style: function(feature) {
+          if (feature.getGeometry().getType() === 'Point') {
+            return redCircleStyle;
+          }
+          return null;
+        }
+      });
+      map.addLayer(vectorLayer);
+
+      const extent = vectorSource.getExtent();
+      if (!ol.extent.isEmpty(extent)) {
+        map.getView().fit(extent, { duration: 1000 });
+      }
+    })
+    .catch(err => {
+      alert('GeoJSONの取得または表示に失敗しました: ' + err.message);
+    });
+}
+
+// ページロード時に /data/sample.geojson を表示
+window.addEventListener('DOMContentLoaded', function() {
+  loadGeoJsonFromUrl('/data/sample.geojson');
+});
