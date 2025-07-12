@@ -26,13 +26,15 @@
 <body>
   <h1>🌍 Cesium 3D GeoJSON Viewer (GitHub Pages版)</h1>
   <div style="margin: 10px 0; padding: 10px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
-    <strong>📍 動作確認済み:</strong> VS Codeローカル環境での動作を基にGitHub Pages用に最適化
+    <strong>📍 動作確認済み:</strong> VS Codeローカル環境での動作を基にGitHub Pages用に最適化<br>
+    <strong>🔄 表示モード:</strong> 3D → Columbus View (2.5D) → 2D の3モード切り替え対応
   </div>
   <div style="margin: 10px 0; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
     <strong>⚠️ 重要な注意事項:</strong><br>
     • 背景地図の読み込みには<strong>5-10秒間のタイムアウト</strong>が必要です<br>
     • 初回表示時や遅いネットワークでは背景が遅れて表示される場合があります<br>
     • 背景が表示されない場合は<strong>20-30秒</strong>お待ちください<br>
+    • <strong>表示モード切り替え時</strong>にも再度タイル読み込みが発生します<br>
     • GitHub Pagesの外部タイルサーバーアクセスには時間がかかる場合があります<br>
     • ネットワークが遅い場合は、さらに時間がかかることがあります
   </div>
@@ -40,6 +42,11 @@
   <button class="retry-button" onclick="retryMapLoad()" style="display: none;" id="retryButton">
     🔄 背景地図の再読み込み
   </button>
+  <div style="margin: 10px 0;">
+    <button class="retry-button" onclick="toggle3D2D()" id="toggleButton" style="display: none;">
+      🌐 Columbus Viewに切り替え
+    </button>
+  </div>
   <input type="file" id="fileInput" accept=".geojson,.json" />
   <div id="cesiumContainer"></div>
   
@@ -64,7 +71,7 @@
           vrButton: false,
           geocoder: false,
           homeButton: true,
-          sceneModePicker: false,
+          sceneModePicker: true,  // 3D/2D切り替えボタンを有効化
           navigationHelpButton: false,
           animation: false,
           timeline: false,
@@ -116,6 +123,9 @@
               
               // タイル読み込み監視を追加
               monitorTileLoading();
+              
+              // 3D/2D切り替えボタンを表示
+              document.getElementById('toggleButton').style.display = 'inline-block';
               
               // さらに時間をおいてデフォルトGeoJSONを読み込み
               setTimeout(() => {
@@ -170,6 +180,41 @@
       }, 30000);
     }
 
+    // モード切り替え用のタイル読み込み監視
+    function monitorTileLoadingForMode(modeName) {
+      if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+
+      let tileLoadCount = 0;
+      const startTime = Date.now();
+      let isCompleted = false;
+
+      const checkTiles = setInterval(() => {
+        if (isCompleted) {
+          clearInterval(checkTiles);
+          return;
+        }
+
+        const tilesLoaded = viewer.scene.globe.tilesLoaded;
+        if (tilesLoaded) {
+          tileLoadCount++;
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          updateStatus(`✅ ${modeName}モード表示完了！ (${elapsed}秒)`);
+          isCompleted = true;
+          clearInterval(checkTiles);
+        }
+      }, 500);
+
+      // 15秒でタイムアウト（モード切り替えは短めに）
+      setTimeout(() => {
+        if (!isCompleted) {
+          clearInterval(checkTiles);
+          if (tileLoadCount === 0) {
+            updateStatus(`⚠️ ${modeName}のタイル読み込みが遅れています...`);
+          }
+        }
+      }, 15000);
+    }
+
     // 背景地図の再読み込み機能
     function retryMapLoad() {
       updateStatus('背景地図を再読み込み中...');
@@ -198,6 +243,76 @@
             document.getElementById('retryButton').style.display = 'block';
           }
         }, 1000);
+      }
+    }
+
+    // 3D/2D表示切り替え機能（3つのモードをサイクル）
+    function toggle3D2D() {
+      if (!viewer) return;
+      
+      const scene = viewer.scene;
+      const toggleButton = document.getElementById('toggleButton');
+      
+      if (scene.mode === Cesium.SceneMode.SCENE3D) {
+        // 3D → Columbus View (2.5D)
+        updateStatus('Columbus View (2.5D) に切り替え中...');
+        scene.mode = Cesium.SceneMode.COLUMBUS_VIEW;
+        toggleButton.textContent = '🗺️ 2D表示に切り替え';
+        
+        // Columbus View用のカメラ設定とタイル読み込み監視
+        setTimeout(() => {
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 200000),  // Columbus Viewでは中程度の高度
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 3,  // 60度下向き
+              roll: 0.0
+            }
+          });
+          
+          monitorTileLoadingForMode('Columbus View (2.5D)');
+        }, 500);
+        
+      } else if (scene.mode === Cesium.SceneMode.COLUMBUS_VIEW) {
+        // Columbus View → 2D
+        updateStatus('2D表示モードに切り替え中...');
+        scene.mode = Cesium.SceneMode.SCENE2D;
+        toggleButton.textContent = '🌍 3D表示に切り替え';
+        
+        // 2D表示では東京を中心に再設定（投影法が変わるため）
+        setTimeout(() => {
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 500000),  // 2Dでは高度を高く
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 2,  // 2Dでは真下を向く
+              roll: 0.0
+            }
+          });
+          
+          // 2D用のタイル読み込み監視
+          monitorTileLoadingForMode('2D表示');
+        }, 1000);  // 少し待ってからカメラ設定
+        
+      } else {
+        // 2D → 3D
+        updateStatus('3D表示モードに切り替え中...');
+        scene.mode = Cesium.SceneMode.SCENE3D;
+        toggleButton.textContent = '🌐 Columbus Viewに切り替え';
+        
+        // 3D表示用のカメラ設定とタイル読み込み監視
+        setTimeout(() => {
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),  // 3Dでは近い距離
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 4,  // 45度下向き
+              roll: 0.0
+            }
+          });
+          
+          monitorTileLoadingForMode('3D表示');
+        }, 500);
       }
     }
 
