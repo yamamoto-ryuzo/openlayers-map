@@ -59,12 +59,12 @@
       console.log(message);
     }
 
-    // 段階的初期化
+    // 段階的初期化（エラーハンドリング強化版）
     async function initializeCesium() {
       updateStatus('Cesiumビューワーを初期化中...');
       
       try {
-        // 最もシンプルな設定で開始
+        // エラーハンドリングを追加したCesiumビューワー設定
         viewer = new Cesium.Viewer('cesiumContainer', {
           imageryProvider: false,
           baseLayerPicker: false,
@@ -75,7 +75,18 @@
           navigationHelpButton: false,
           animation: false,
           timeline: false,
-          fullscreenButton: true
+          fullscreenButton: true,
+          shouldAnimate: true,
+          requestRenderMode: false, // 継続的レンダリングを有効化
+          maximumRenderTimeChange: Infinity
+        });
+
+        // グローバルエラーハンドラーを追加
+        viewer.cesiumWidget.creditContainer.style.display = "none";
+        
+        // Cesiumの内部エラーを捕捉
+        viewer.scene.renderError.addEventListener(function(scene, error) {
+          console.log('Cesium描画エラー:', error);
         });
 
         updateStatus('ビューワー作成完了。背景地図を設定中...');
@@ -84,65 +95,62 @@
         viewer.scene.globe.show = false;
         viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
 
-        // 段階的読み込み: まず基本的な地球を表示してから背景を追加
-        setTimeout(() => {
-          updateStatus('Step 1: 基本地球を表示中...');
-          viewer.scene.globe.show = true;
-          viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
+        // Promise チェーンの代わりにasync/await使用でエラーハンドリング改善
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        updateStatus('Step 1: 基本地球を表示中...');
+        viewer.scene.globe.show = true;
+        viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
+        
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        try {
+          updateStatus('Step 2: OpenStreetMapを読み込み中... (最大30秒かかる場合があります)');
           
-          // さらに待ってからOpenStreetMapを追加
-          setTimeout(() => {
-            try {
-              updateStatus('Step 2: OpenStreetMapを読み込み中... (最大30秒かかる場合があります)');
-              
-              const osmProvider = new Cesium.UrlTemplateImageryProvider({
-                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: ['a', 'b', 'c'],
-                maximumLevel: 19,
-                minimumLevel: 0,
-                credit: 'Map data © OpenStreetMap contributors',
-                enablePickFeatures: false
-              });
+          const osmProvider = new Cesium.UrlTemplateImageryProvider({
+            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            subdomains: ['a', 'b', 'c'],
+            maximumLevel: 19,
+            minimumLevel: 0,
+            credit: 'Map data © OpenStreetMap contributors',
+            enablePickFeatures: false
+          });
 
-              viewer.scene.imageryLayers.addImageryProvider(osmProvider);
-              
-              updateStatus('Step 3: OpenStreetMap追加完了。タイル読み込み中...');
+          viewer.scene.imageryLayers.addImageryProvider(osmProvider);
+          
+          updateStatus('Step 3: OpenStreetMap追加完了。タイル読み込み中...');
 
-              // 東京を中心に設定（より詳細な設定）
-              viewer.camera.setView({
-                destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),
-                orientation: {
-                  heading: 0.0,
-                  pitch: -Math.PI / 4,  // 45度下向き
-                  roll: 0.0
-                }
-              });
-
-              // イベントリスナーを設定
-              setupEventListeners();
-              
-              // タイル読み込み監視を追加
-              monitorTileLoading();
-              
-              // 3D/2D切り替えボタンを表示
-              document.getElementById('toggleButton').style.display = 'inline-block';
-              
-              // さらに時間をおいてデフォルトGeoJSONを読み込み
-              setTimeout(() => {
-                loadDefaultGeoJSON();
-              }, 2000);
-
-            } catch (osmError) {
-              console.error('OpenStreetMap読み込みエラー:', osmError);
-              updateStatus('OpenStreetMap読み込み失敗。基本表示で継続します。');
-              
-              // フォールバック: 基本表示でも操作可能にする
-              setupEventListeners();
-              loadDefaultGeoJSON();
+          // 東京（江東区）を中心に設定
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 50000),
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 4,
+              roll: 0.0
             }
-          }, 5000);  // 5秒待機してからOpenStreetMap読み込み
+          });
+
+          // イベントリスナーを設定
+          setupEventListeners();
           
-        }, 2000);  // まず2秒待機してから基本地球表示
+          // タイル読み込み監視を追加
+          monitorTileLoading();
+          
+          // 3D/2D切り替えボタンを表示
+          document.getElementById('toggleButton').style.display = 'inline-block';
+          
+          // デフォルトGeoJSONを読み込み（エラーハンドリング付き）
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await loadDefaultGeoJSONSafe();
+
+        } catch (osmError) {
+          console.error('OpenStreetMap読み込みエラー:', osmError);
+          updateStatus('OpenStreetMap読み込み失敗。基本表示で継続します。');
+          
+          // フォールバック: 基本表示でも操作可能にする
+          setupEventListeners();
+          await loadDefaultGeoJSONSafe();
+        }
 
       } catch (error) {
         console.error('Cesium初期化エラー:', error);
@@ -246,12 +254,18 @@
       }
     }
 
-    // 3D/2D表示切り替え機能（3つのモードをサイクル）
+    // 3D/2D表示切り替え機能（3つのモードをサイクル）- デバッグ強化版
     function toggle3D2D() {
-      if (!viewer) return;
+      if (!viewer) {
+        console.error('Viewerが初期化されていません');
+        return;
+      }
       
       const scene = viewer.scene;
       const toggleButton = document.getElementById('toggleButton');
+      
+      console.log('現在のモード:', scene.mode);
+      console.log('現在のデータソース数:', viewer.dataSources.length);
       
       // GEOJSONデータソースを保存（モード切り替え時に保持するため）
       const dataSources = [];
@@ -259,6 +273,7 @@
         const dataSource = viewer.dataSources.get(i);
         dataSources.push(dataSource);
       }
+      console.log('保存されたデータソース数:', dataSources.length);
       
       if (scene.mode === Cesium.SceneMode.SCENE3D) {
         // 3D → Columbus View (2.5D)
@@ -267,18 +282,49 @@
         toggleButton.textContent = '🗺️ 2D表示に切り替え';
         
         // Columbus View用のカメラ設定とタイル読み込み監視
-        setTimeout(() => {
+        setTimeout(async () => {
+          console.log('Columbus View切り替え処理開始');
+          
+          // Columbus View切り替え直後にカメラを江東区に設定
           viewer.camera.setView({
-            destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 200000),  // Columbus Viewでは中程度の高度
+            destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 100000),
             orientation: {
               heading: 0.0,
-              pitch: -Math.PI / 3,  // 60度下向き
+              pitch: -Math.PI / 6,  // 30度下向き
               roll: 0.0
             }
           });
+          console.log('Columbus View初期カメラ設定完了');
           
-          // GEOJSONデータソースを再適用
-          restoreDataSources(dataSources);
+          // カメラ設定後にデータを読み込み
+          try {
+            console.log('Columbus View用にデータを再読み込み');
+            await reloadDataForColumbusView();
+            
+            // データ読み込み後に座標をチェック
+            setTimeout(() => {
+              const wasFixed = forceFixColumbusViewPosition();
+              if (wasFixed) {
+                updateStatus('⚠️ Columbus View位置を修正しました');
+              } else {
+                updateStatus('✅ Columbus View (2.5D) 切り替え完了');
+              }
+            }, 1000);
+            
+          } catch (error) {
+            console.error('Columbus ViewでのGeoJSON読み込みエラー:', error);
+            updateStatus('⚠️ Columbus View (2.5D)（データ読み込み失敗）');
+            
+            // エラー時も江東区にカメラを設定
+            viewer.camera.setView({
+              destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 100000),
+              orientation: {
+                heading: 0.0,
+                pitch: -Math.PI / 6,
+                roll: 0.0
+              }
+            });
+          }
           
           monitorTileLoadingForMode('Columbus View (2.5D)');
         }, 500);
@@ -289,23 +335,60 @@
         scene.mode = Cesium.SceneMode.SCENE2D;
         toggleButton.textContent = '🌍 3D表示に切り替え';
         
-        // 2D表示では東京を中心に再設定（投影法が変わるため）
-        setTimeout(() => {
+        // 2D表示では投影法が変わるため、データを完全に再読み込み
+        setTimeout(async () => {
+          console.log('2Dモード切り替け開始');
+          
+          // 2D切り替え直後にカメラを江東区に強制設定
+          console.log('2Dモード初期カメラ設定...');
           viewer.camera.setView({
-            destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 500000),  // 2Dでは高度を高く
+            destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 200000),
             orientation: {
               heading: 0.0,
-              pitch: -Math.PI / 2,  // 2Dでは真下を向く
+              pitch: -Math.PI / 2,  // 真下を向く
               roll: 0.0
             }
           });
+          console.log('2Dモード初期カメラ設定完了');
           
-          // GEOJSONデータソースを再適用
-          restoreDataSources(dataSources);
+          // 既存のデータソースを一旦全てクリア
+          viewer.dataSources.removeAll();
+          
+          // 少し待ってからデータ読み込み
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // 2Dモード専用のGeoJSON読み込み
+          try {
+            await reload2DGeoJSON();
+            
+            // データ読み込み後に座標をチェック
+            setTimeout(() => {
+              const wasFixed = forceFixScene2DPosition();
+              if (wasFixed) {
+                updateStatus('⚠️ 2Dモード位置を修正しました');
+              } else {
+                updateStatus('✅ 2D表示モード切り替え完了');
+              }
+            }, 1000);
+            
+          } catch (error) {
+            console.error('2DモードGeoJSON読み込みエラー:', error);
+            updateStatus('⚠️ 2D表示モード（データ読み込み失敗）');
+            
+            // エラー時も江東区にカメラを強制設定
+            viewer.camera.setView({
+              destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 200000),
+              orientation: {
+                heading: 0.0,
+                pitch: -Math.PI / 2,
+                roll: 0.0
+              }
+            });
+          }
           
           // 2D用のタイル読み込み監視
           monitorTileLoadingForMode('2D表示');
-        }, 1000);  // 少し待ってからカメラ設定
+        }, 1000);  // モード切り替え後に実行
         
       } else {
         // 2D → 3D
@@ -314,9 +397,21 @@
         toggleButton.textContent = '🌐 Columbus Viewに切り替え';
         
         // 3D表示用のカメラ設定とタイル読み込み監視
-        setTimeout(() => {
+        setTimeout(async () => {
+          console.log('3Dモード復帰処理開始');
+          
+          // 3Dモード用にデータを再読み込み
+          try {
+            await loadDefaultGeoJSONSafe();
+            updateStatus('✅ 3D表示モード切り替え完了');
+          } catch (error) {
+            console.error('3DモードGeoJSON読み込みエラー:', error);
+            updateStatus('⚠️ 3D表示モード（データ読み込み失敗）');
+          }
+          
+          // 3Dモード用のカメラ設定
           viewer.camera.setView({
-            destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),  // 3Dでは近い距離
+            destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 50000),
             orientation: {
               heading: 0.0,
               pitch: -Math.PI / 4,  // 45度下向き
@@ -324,15 +419,12 @@
             }
           });
           
-          // GEOJSONデータソースを再適用
-          restoreDataSources(dataSources);
-          
           monitorTileLoadingForMode('3D表示');
         }, 500);
       }
     }
 
-    // GEOJSONデータソースを復元する関数
+    // GEOJSONデータソースを復元する関数（簡素化版）
     function restoreDataSources(dataSources) {
       if (!viewer || !dataSources || dataSources.length === 0) return;
       
@@ -347,16 +439,189 @@
           console.log('データソース復元エラー:', error);
         }
       });
+    }
+
+    // 2Dモード専用のデータソース復元関数（簡略化版）
+    function restoreDataSourcesFor2D(dataSources) {
+      if (!viewer || !dataSources || dataSources.length === 0) {
+        console.log('2Dモード：データソースがないため、デフォルトGeoJSONを読み込みます');
+        reloadDefaultGeoJSONFor2D();
+        return;
+      }
       
-      // データがある場合はズーム調整
-      if (dataSources.length > 0) {
-        setTimeout(() => {
-          try {
-            viewer.zoomTo(viewer.dataSources);
-          } catch (error) {
-            console.log('ズーム調整エラー:', error);
+      console.log('2Dモード用データソース復元開始...', dataSources.length, '個');
+      
+      // 既存のデータソースをクリア
+      viewer.dataSources.removeAll();
+      
+      // シンプルなフォールバック：元のデータソースをそのまま追加
+      dataSources.forEach((dataSource, index) => {
+        try {
+          viewer.dataSources.add(dataSource);
+          console.log(`データソース ${index} を2Dモードで復元完了`);
+        } catch (error) {
+          console.error(`データソース ${index} 復元エラー:`, error);
+        }
+      });
+      
+      // データソース復元がうまくいかない場合のフォールバック
+      setTimeout(() => {
+        if (viewer.dataSources.length === 0) {
+          console.log('データソース復元失敗。デフォルトGeoJSONを読み込みます');
+          reloadDefaultGeoJSONFor2D();
+        }
+      }, 1000);
+    }
+
+    // Columbus View専用のGeoJSON読み込み（座標変換対応版）
+    async function reloadDataForColumbusView() {
+      console.log('=== Columbus View用GeoJSON読み込み開始 ===');
+      
+      try {
+        if (!viewer) throw new Error('Viewerが初期化されていません');
+        
+        console.log('現在のシーンモード:', viewer.scene.mode);
+        console.log('Columbus Viewか確認:', viewer.scene.mode === Cesium.SceneMode.COLUMBUS_VIEW);
+        
+        const geojsonPath = './data/sample.geojson';
+        console.log('GeoJSONファイルを取得中:', geojsonPath);
+        
+        const response = await fetch(geojsonPath);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const geojson = await response.json();
+        console.log('Columbus View用GeoJSONデータ取得:', geojson.features.length, '個');
+        
+        // 座標範囲を確認
+        const firstFeature = geojson.features[0];
+        if (firstFeature && firstFeature.geometry && firstFeature.geometry.coordinates) {
+          console.log('最初のフィーチャー座標:', firstFeature.geometry.coordinates);
+        }
+        
+        // 既存データをクリア
+        console.log('既存データソースをクリア（現在:', viewer.dataSources.length, '個）');
+        viewer.dataSources.removeAll();
+        
+        // 少し待ってからデータソース作成
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Columbus View用のデータソース作成
+        console.log('Columbus View用データソースを作成中...');
+        const dataSource = new Cesium.GeoJsonDataSource('Columbus_View_Data_v2');
+        
+        // Columbus Viewに特化した設定でロード
+        await dataSource.load(geojson, {
+          clampToGround: false,  // Columbus Viewでも地面に固定しない
+          stroke: Cesium.Color.GREEN,
+          fill: Cesium.Color.GREEN.withAlpha(0.7),
+          strokeWidth: 4,
+          markerSize: 52,
+          markerSymbol: '?',
+          markerColor: Cesium.Color.GREEN,
+          pixelSize: 18
+        });
+        
+        console.log('Columbus View用データソース作成完了');
+        
+        // ビューワーにデータソースを追加
+        viewer.dataSources.add(dataSource);
+        console.log('Columbus View用データソースをビューワーに追加:', viewer.dataSources.length, '個');
+        
+        // 少し待ってからカメラ設定
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Columbus View用のカメラ設定（江東区中心を明示的に指定）
+        console.log('Columbus View用カメラを設定中...');
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 100000), // 江東区中心
+          orientation: {
+            heading: 0.0,
+            pitch: -Math.PI / 6,  // 30度下向き
+            roll: 0.0
           }
-        }, 1000);
+        });
+        
+        console.log('Columbus View用カメラ設定完了');
+        
+        // データが見えるかズームテスト
+        try {
+          console.log('Columbus Viewデータソースへのズームを試行中...');
+          await viewer.zoomTo(dataSource);
+          console.log('Columbus View用ズーム成功');
+          
+          // ズーム後、視野を調整（Columbus View用）
+          setTimeout(() => {
+            const camera = viewer.camera;
+            const currentPosition = camera.position;
+            const cartographic = Cesium.Cartographic.fromCartesian(currentPosition);
+            
+            // 現在位置が日本付近（東経130-145度、北緯30-40度）にあるか確認
+            const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+            const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+            console.log('ズーム後の位置:', longitude, latitude);
+            
+            if (longitude < 130 || longitude > 145 || latitude < 30 || latitude > 40) {
+              console.warn('位置が日本から外れています。強制的に江東区に移動します。');
+              // 強制的に江東区に設定
+              viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 120000),
+                orientation: {
+                  heading: 0.0,
+                  pitch: -Math.PI / 6,
+                  roll: 0.0
+                }
+              });
+            } else {
+              // 適切な位置にある場合は少し引く
+              camera.setView({
+                destination: Cesium.Cartesian3.fromRadians(
+                  cartographic.longitude,
+                  cartographic.latitude,
+                  Math.max(cartographic.height * 1.3, 120000)
+                ),
+                orientation: {
+                  heading: 0.0,
+                  pitch: -Math.PI / 6,
+                  roll: 0.0
+                }
+              });
+            }
+            console.log('Columbus View用視野調整完了');
+          }, 500);
+          
+        } catch (zoomError) {
+          console.warn('Columbus Viewズーム失敗、手動設定:', zoomError);
+          // ズーム失敗時は強制的に江東区に設定
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 120000),
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 6,
+              roll: 0.0
+            }
+          });
+          console.log('Columbus View手動カメラ設定完了');
+        }
+        
+        console.log('=== Columbus View用GeoJSON読み込み完了 ===');
+        return dataSource;
+        
+      } catch (error) {
+        console.error('=== Columbus View用GeoJSON読み込み失敗 ===', error);
+        throw error;
+      }
+    }
+
+    // Columbus View用デフォルトGeoJSON読み込み
+    async function loadDefaultGeoJSONForColumbusView() {
+      console.log('Columbus View用デフォルトGeoJSON読み込み');
+      
+      try {
+        await reloadDataForColumbusView();
+      } catch (error) {
+        console.error('Columbus View用デフォルト読み込み失敗:', error);
       }
     }
 
@@ -377,10 +642,12 @@
             // GeoJSONデータソースを作成
             const dataSource = new Cesium.GeoJsonDataSource();
             dataSource.load(geojson, {
-              clampToGround: true,
+              clampToGround: true,  // 地表面に固定
               stroke: Cesium.Color.YELLOW,
               fill: Cesium.Color.YELLOW.withAlpha(0.5),
-              strokeWidth: 3
+              strokeWidth: 3,
+              markerSize: 48,  // ポイントサイズを大きく
+              markerSymbol: '?'  // 明確なマーカー
             }).then(function() {
               viewer.dataSources.add(dataSource);
               viewer.zoomTo(dataSource);
@@ -394,6 +661,43 @@
         };
         reader.readAsText(file);
       });
+    }
+
+    // 安全なデフォルトGeoJSON読み込み
+    async function loadDefaultGeoJSONSafe() {
+      try {
+        console.log('安全なGeoJSON読み込み開始');
+        const geojsonPath = './data/sample.geojson';
+        
+        const response = await fetch(geojsonPath);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const geojson = await response.json();
+        if (!viewer) return;
+        
+        const dataSource = new Cesium.GeoJsonDataSource();
+        await dataSource.load(geojson, {
+          clampToGround: true,
+          stroke: Cesium.Color.BLUE,
+          fill: Cesium.Color.BLUE.withAlpha(0.5),
+          strokeWidth: 3,
+          markerSize: 48,
+          markerSymbol: '?'
+        });
+        
+        viewer.dataSources.add(dataSource);
+        await viewer.zoomTo(dataSource);
+        updateStatus('デフォルトGeoJSONデータ表示完了');
+        
+        // バックアップ用に保存
+        window.defaultGeoJSONSource = dataSource;
+        
+      } catch (error) {
+        console.log('デフォルトGeoJSON読み込み失敗:', error);
+        updateStatus('地図表示準備完了（サンプルデータなし）');
+      }
     }
 
     function loadDefaultGeoJSON() {
@@ -412,10 +716,12 @@
           
           const dataSource = new Cesium.GeoJsonDataSource();
           return dataSource.load(geojson, {
-            clampToGround: true,
+            clampToGround: true,  // 地表面に固定
             stroke: Cesium.Color.BLUE,
             fill: Cesium.Color.BLUE.withAlpha(0.5),
-            strokeWidth: 3
+            strokeWidth: 3,
+            markerSize: 48,  // ポイントサイズを大きく
+            markerSymbol: '?'  // 明確なマーカー
           });
         })
         .then(dataSource => {
@@ -423,6 +729,9 @@
           viewer.dataSources.add(dataSource);
           viewer.zoomTo(dataSource);
           updateStatus('デフォルトGeoJSONデータ表示完了');
+          
+          // 2Dモード用のバックアップデータを保存
+          window.defaultGeoJSONSource = dataSource;
         })
         .catch(error => {
           console.log('デフォルトGeoJSON読み込み失敗:', error);
@@ -430,8 +739,296 @@
         });
     }
 
-    // ページ読み込み完了後に初期化
-    document.addEventListener('DOMContentLoaded', initializeCesium);
+    // 2Dモード専用の確実なGeoJSON読み込み（改良版）
+    async function reload2DGeoJSON() {
+      console.log('=== 2Dモード専用GeoJSON読み込み開始 ===');
+      
+      try {
+        // まずビューワーの状態を確認
+        if (!viewer) {
+          throw new Error('Viewerが初期化されていません');
+        }
+        
+        console.log('現在のシーンモード:', viewer.scene.mode);
+        console.log('2Dモードか確認:', viewer.scene.mode === Cesium.SceneMode.SCENE2D);
+        
+        const geojsonPath = './data/sample.geojson';
+        console.log('GeoJSONファイルを取得中:', geojsonPath);
+        
+        const response = await fetch(geojsonPath);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const geojson = await response.json();
+        console.log('GeoJSONデータ取得完了:', geojson.features.length, '個のフィーチャー');
+        
+        // 座標範囲を確認
+        const firstFeature = geojson.features[0];
+        if (firstFeature && firstFeature.geometry && firstFeature.geometry.coordinates) {
+          console.log('最初のフィーチャー座標:', firstFeature.geometry.coordinates);
+        }
+        
+        // 既存のデータソースを完全にクリア
+        console.log('既存データソースをクリア（現在:', viewer.dataSources.length, '個）');
+        viewer.dataSources.removeAll();
+        
+        // 少し待ってからデータソース作成
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // 2Dモード専用のデータソースを作成
+        console.log('2Dモード用データソースを作成中...');
+        const dataSource = new Cesium.GeoJsonDataSource('2D_Mode_Data_v2');
+        
+        // 2Dモードに特化した設定でロード
+        await dataSource.load(geojson, {
+          clampToGround: false,  // 2Dでは地面に固定しない
+          stroke: Cesium.Color.RED,
+          fill: Cesium.Color.RED.withAlpha(0.7),
+          strokeWidth: 5,
+          markerSize: 64,  // 2Dでは大きめのマーカー
+          markerSymbol: '?',
+          markerColor: Cesium.Color.RED,
+          pixelSize: 20  // ピクセルサイズも指定
+        });
+        
+        console.log('2Dモード用データソース作成完了');
+        
+        // ビューワーにデータソースを追加
+        viewer.dataSources.add(dataSource);
+        console.log('データソースをビューワーに追加:', viewer.dataSources.length, '個');
+        
+        // 少し待ってからカメラ設定
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // 2Dモード用のカメラ設定（江東区中心）
+        console.log('2Dモード用カメラを設定中...');
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 200000), // 高度を上げる
+          orientation: {
+            heading: 0.0,
+            pitch: -Math.PI / 2,  // 真下を向く
+            roll: 0.0
+          }
+        });
+        
+        console.log('2Dモード用カメラ設定完了');
+        
+        // データが見えるかズームテスト
+        try {
+          console.log('データソースへのズームを試行中...');
+          await viewer.zoomTo(dataSource);
+          console.log('2Dモード用ズーム成功');
+          
+          // ズーム後、視野を調整
+          setTimeout(() => {
+            const camera = viewer.camera;
+            const currentPosition = camera.position;
+            const cartographic = Cesium.Cartographic.fromCartesian(currentPosition);
+            
+            // 現在位置が日本付近（東経130-145度、北緯30-40度）にあるか確認
+            const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+            const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+            console.log('ズーム後の2Dモード位置:', longitude, latitude);
+            
+            if (longitude < 130 || longitude > 145 || latitude < 30 || latitude > 40) {
+              console.warn('2Dモードで位置が日本から外れています。強制的に江東区に移動します。');
+              // 強制的に江東区に設定
+              viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 250000),
+                orientation: {
+                  heading: 0.0,
+                  pitch: -Math.PI / 2,
+                  roll: 0.0
+                }
+              });
+              console.log('2Dモード位置を強制修正完了');
+            } else {
+              // 適切な位置にある場合は少し引く
+              camera.setView({
+                destination: Cesium.Cartesian3.fromRadians(
+                  cartographic.longitude,
+                  cartographic.latitude,
+                  Math.max(cartographic.height * 1.5, 250000)  // さらに引く
+                ),
+                orientation: {
+                  heading: 0.0,
+                  pitch: -Math.PI / 2,
+                  roll: 0.0
+                }
+              });
+              console.log('2Dモード用視野調整完了');
+            }
+          }, 500);
+          
+        } catch (zoomError) {
+          console.warn('2Dズーム失敗、手動カメラ設定:', zoomError);
+          // ズーム失敗時は手動でカメラ設定
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 250000),
+            orientation: {
+              heading: 0.0,
+              pitch: -Math.PI / 2,
+              roll: 0.0
+            }
+          });
+          console.log('2Dモード手動カメラ設定完了');
+        }
+        
+        console.log('=== 2Dモード専用GeoJSON読み込み完了 ===');
+        return dataSource;
+        
+      } catch (error) {
+        console.error('=== 2DモードGeoJSON読み込み失敗 ===', error);
+        throw error;
+      }
+    }
+
+    // 2Dモード専用のデフォルトGeoJSON再読み込み（簡略化版）
+    function reloadDefaultGeoJSONFor2D() {
+      console.log('2Dモード用デフォルトGeoJSON読み込み開始');
+      const geojsonPath = './data/sample.geojson';
+      
+      fetch(geojsonPath)
+        .then(response => response.json())
+        .then(geojson => {
+          if (!viewer) return;
+          
+          // 既存のデータソースをクリア
+          viewer.dataSources.removeAll();
+          
+          const dataSource = new Cesium.GeoJsonDataSource('Default2D');
+          return dataSource.load(geojson, {
+            clampToGround: true,
+            stroke: Cesium.Color.BLUE,
+            fill: Cesium.Color.BLUE.withAlpha(0.5),
+            strokeWidth: 3,
+            markerSize: 48,
+            markerSymbol: '?'
+          });
+        })
+        .then(dataSource => {
+          if (!viewer) return;
+          viewer.dataSources.add(dataSource);
+          console.log('2Dモード用デフォルトGeoJSON読み込み完了');
+          
+          // データ中心にズーム（エラーハンドリング付き）
+          setTimeout(() => {
+            viewer.zoomTo(dataSource).catch(error => {
+              console.log('2Dズームエラー（通常）:', error);
+              // フォールバック：手動でカメラ設定
+              viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 120000),
+                orientation: {
+                  heading: 0.0,
+                  pitch: -Math.PI / 2,
+                  roll: 0.0
+                }
+              });
+            });
+          }, 500);
+        })
+        .catch(error => {
+          console.error('2Dモード用GeoJSON読み込み失敗:', error);
+          updateStatus('2Dモード：GeoJSON読み込み失敗');
+        });
+    }
+
+    // Columbus View用の緊急座標修正機能
+    function forceFixColumbusViewPosition() {
+      if (!viewer || viewer.scene.mode !== Cesium.SceneMode.COLUMBUS_VIEW) {
+        return;
+      }
+      
+      console.log('Columbus View座標修正チェック開始');
+      
+      const camera = viewer.camera;
+      const currentPosition = camera.position;
+      const cartographic = Cesium.Cartographic.fromCartesian(currentPosition);
+      const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+      const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+      
+      console.log('現在のColumbus View位置:', longitude, latitude);
+      
+      // 日本から大きく外れている場合（アフリカなど）は強制修正
+      if (longitude < 120 || longitude > 150 || latitude < 20 || latitude > 50) {
+        console.warn('Columbus Viewで位置が日本から大きく外れています。強制修正します。');
+        console.log('修正前の位置:', longitude, latitude);
+        
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 120000),
+          orientation: {
+            heading: 0.0,
+            pitch: -Math.PI / 6,
+            roll: 0.0
+          }
+        });
+        
+        console.log('Columbus View位置を江東区に修正完了');
+        return true;
+      }
+      
+      console.log('Columbus View位置は正常範囲内です');
+      return false;
+    }
+
+    // 2Dモード用の緊急座標修正機能
+    function forceFixScene2DPosition() {
+      if (!viewer || viewer.scene.mode !== Cesium.SceneMode.SCENE2D) {
+        return;
+      }
+      
+      console.log('2Dモード座標修正チェック開始');
+      
+      const camera = viewer.camera;
+      const currentPosition = camera.position;
+      const cartographic = Cesium.Cartographic.fromCartesian(currentPosition);
+      const longitude = Cesium.Math.toDegrees(cartographic.longitude);
+      const latitude = Cesium.Math.toDegrees(cartographic.latitude);
+      
+      console.log('現在の2Dモード位置:', longitude, latitude);
+      
+      // 日本から大きく外れている場合（アフリカなど）は強制修正
+      if (longitude < 120 || longitude > 150 || latitude < 20 || latitude > 50) {
+        console.warn('2Dモードで位置が日本から大きく外れています。強制修正します。');
+        console.log('修正前の位置:', longitude, latitude);
+        
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.831, 35.681, 200000),
+          orientation: {
+            heading: 0.0,
+            pitch: -Math.PI / 2,  // 真下を向く
+            roll: 0.0
+          }
+        });
+        
+        console.log('2Dモード位置を江東区に修正完了');
+        return true;
+      }
+      
+      console.log('2Dモード位置は正常範囲内です');
+      return false;
+    }
+
+    // ページ読み込み完了後に初期化（エラーハンドリング強化）
+    document.addEventListener('DOMContentLoaded', async function() {
+      try {
+        await initializeCesium();
+      } catch (error) {
+        console.error('初期化エラー:', error);
+        updateStatus('地図の初期化でエラーが発生しました。ページを再読み込みしてください。');
+      }
+    });
+
+    // グローバルエラーハンドラー
+    window.addEventListener('error', function(event) {
+      console.log('グローバルエラー:', event.error);
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      console.log('未処理のPromise拒否:', event.reason);
+      event.preventDefault(); // エラーの伝播を止める
+    });
   </script>
 </body>
 </html>
