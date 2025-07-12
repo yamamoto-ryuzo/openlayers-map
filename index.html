@@ -253,6 +253,13 @@
       const scene = viewer.scene;
       const toggleButton = document.getElementById('toggleButton');
       
+      // GEOJSONデータソースを保存（モード切り替え時に保持するため）
+      const dataSources = [];
+      for (let i = 0; i < viewer.dataSources.length; i++) {
+        const dataSource = viewer.dataSources.get(i);
+        dataSources.push(dataSource);
+      }
+      
       if (scene.mode === Cesium.SceneMode.SCENE3D) {
         // 3D → Columbus View (2.5D)
         updateStatus('Columbus View (2.5D) に切り替え中...');
@@ -269,6 +276,9 @@
               roll: 0.0
             }
           });
+          
+          // GEOJSONデータソースを再適用
+          restoreDataSources(dataSources);
           
           monitorTileLoadingForMode('Columbus View (2.5D)');
         }, 500);
@@ -289,6 +299,9 @@
               roll: 0.0
             }
           });
+          
+          // GEOJSONデータソースを再適用
+          restoreDataSources(dataSources);
           
           // 2D用のタイル読み込み監視
           monitorTileLoadingForMode('2D表示');
@@ -311,8 +324,39 @@
             }
           });
           
+          // GEOJSONデータソースを再適用
+          restoreDataSources(dataSources);
+          
           monitorTileLoadingForMode('3D表示');
         }, 500);
+      }
+    }
+
+    // GEOJSONデータソースを復元する関数
+    function restoreDataSources(dataSources) {
+      if (!viewer || !dataSources || dataSources.length === 0) return;
+      
+      // 既存のデータソースをクリア
+      viewer.dataSources.removeAll();
+      
+      // 保存されたデータソースを再追加
+      dataSources.forEach(dataSource => {
+        try {
+          viewer.dataSources.add(dataSource);
+        } catch (error) {
+          console.log('データソース復元エラー:', error);
+        }
+      });
+      
+      // データがある場合はズーム調整
+      if (dataSources.length > 0) {
+        setTimeout(() => {
+          try {
+            viewer.zoomTo(viewer.dataSources);
+          } catch (error) {
+            console.log('ズーム調整エラー:', error);
+          }
+        }, 1000);
       }
     }
 
