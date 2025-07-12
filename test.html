@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Pages テスト</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .status {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .link-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .map-link {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: white;
+            transition: transform 0.3s, background 0.3s;
+            text-align: center;
+        }
+        .map-link:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .map-link h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ OpenLayers Map Viewer</h1>
+        
+        <div class="status">
+            <h3>✅ GitHub Pages 動作確認</h3>
+            <p>このページが表示されている場合、GitHub Pagesは正常に動作しています。</p>
+            <p><strong>現在時刻:</strong> <span id="currentTime"></span></p>
+        </div>
+
+        <div class="link-grid">
+            <a href="index.html" class="map-link">
+                <h3>🌍 3D Cesium Map</h3>
+                <p>OpenStreetMapを背景とした3D地図ビューアー</p>
+            </a>
+            
+            <a href="index2d.html" class="map-link">
+                <h3>🗺️ 2D OpenLayers Map</h3>
+                <p>安定した2D地図ビューアー（OpenLayers）</p>
+            </a>
+            
+            <a href="index-simple.html" class="map-link">
+                <h3>🔧 Simple 3D Test</h3>
+                <p>シンプルなCesiumテストビューアー</p>
+            </a>
+            
+            <a href="index-test.html" class="map-link">
+                <h3>⚡ Debug Test</h3>
+                <p>デバッグ用最小構成ビューアー</p>
+            </a>
+        </div>
+
+        <div class="status">
+            <h3>📋 動作状況</h3>
+            <ul>
+                <li>GitHub Pages: <span style="color: #90EE90;">✅ 動作中</span></li>
+                <li>Cesium 3D: テスト中...</li>
+                <li>OpenLayers 2D: <span style="color: #90EE90;">✅ 動作確認済み</span></li>
+                <li>OpenStreetMap: テスト中...</li>
+            </ul>
+        </div>
+        
+        <div class="status">
+            <h3>🔗 リポジトリ情報</h3>
+            <p>
+                <strong>Repository:</strong> 
+                <a href="https://github.com/yamamoto-ryuzo/openlayers-map" 
+                   style="color: #87CEEB;">yamamoto-ryuzo/openlayers-map</a>
+            </p>
+            <p><strong>Branch:</strong> main</p>
+            <p><strong>Last Update:</strong> 2025年7月12日</p>
+        </div>
+    </div>
+
+    <script>
+        // 現在時刻を表示
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('ja-JP');
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // ページロード時のテスト
+        console.log('GitHub Pages テストページが正常に読み込まれました');
+        console.log('現在のURL:', window.location.href);
+        console.log('ブラウザ:', navigator.userAgent);
+    </script>
+</body>
+</html>
