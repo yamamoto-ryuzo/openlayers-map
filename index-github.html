@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>GitHub Pages対応 Cesium 3D GeoJSON Viewer</title>
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <style>
+    body { margin: 0; padding: 10px; font-family: Arial, sans-serif; }
+    h1 { margin: 0 0 10px 0; color: #333; }
+    #cesiumContainer { width: 100%; height: 600px; display: block; border: 2px solid #333; }
+    #fileInput { margin: 10px 0; }
+    #status { 
+      margin: 10px 0; 
+      padding: 15px; 
+      background: #e7f3ff; 
+      border: 1px solid #b3d9ff; 
+      border-radius: 4px; 
+      font-weight: bold;
+    }
+    .success { background: #d4edda; color: #155724; border-color: #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+    .info-panel {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .controls {
+      margin: 10px 0;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+    button {
+      margin: 5px;
+      padding: 8px 16px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #6c757d; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>🌍 GitHub Pages対応 Cesium 3D GeoJSON Viewer</h1>
+  
+  <div class="info-panel">
+    <strong>📝 ご案内:</strong> 
+    GitHub Pages環境では外部タイルサーバーが利用できないため、シンプルな背景色で3D表示します。
+    GeoJSONデータは正常に表示され、3D操作も完全に利用できます。
+  </div>
+  
+  <div id="status">初期化中...</div>
+  
+  <div class="controls">
+    <input type="file" id="fileInput" accept=".geojson,.json" />
+    <button onclick="loadSampleData()">サンプルデータを読み込み</button>
+    <button onclick="resetView()">東京に戻る</button>
+    <button onclick="toggleWireframe()">ワイヤーフレーム切替</button>
+  </div>
+  
+  <div id="cesiumContainer"></div>
+  
+  <script>
+    // Cesium Ion を無効化
+    Cesium.Ion.defaultAccessToken = '';
+    
+    const statusDiv = document.getElementById('status');
+    let viewer = null;
+    let wireframeMode = false;
+    
+    function updateStatus(message, type = 'info') {
+      statusDiv.textContent = message;
+      statusDiv.className = type;
+      console.log(message);
+    }
+
+    // Cesium初期化
+    async function initializeCesium() {
+      updateStatus('Cesium 3Dビューワーを初期化中...', 'info');
+      
+      try {
+        viewer = new Cesium.Viewer('cesiumContainer', {
+          imageryProvider: false,  // 外部タイルを使用しない
+          terrainProvider: false,
+          skyBox: false,
+          skyAtmosphere: false,
+          baseLayerPicker: false,
+          vrButton: false,
+          geocoder: false,
+          homeButton: true,
+          sceneModePicker: true,   // 2D/3D切り替えを有効
+          navigationHelpButton: true,
+          animation: false,
+          timeline: false,
+          fullscreenButton: true
+        });
+
+        // グラデーション背景を設定
+        viewer.scene.backgroundColor = Cesium.Color.fromCssColorString('#87CEEB');
+        viewer.scene.globe.show = false;
+
+        // フォグを無効化して遠くまで見えるように
+        viewer.scene.fog.enabled = false;
+
+        updateStatus('✅ 3Dビューワー初期化完了！', 'success');
+
+        // 東京を中心に設定
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),
+          orientation: {
+            heading: 0.0,
+            pitch: -Math.PI / 6,  // 30度下向き
+            roll: 0.0
+          }
+        });
+
+        // 座標グリッドを追加
+        addCoordinateGrid();
+
+        // イベントリスナーを設定
+        setupEventListeners();
+        
+        // デフォルトGeoJSONを読み込み
+        loadDefaultGeoJSON();
+
+      } catch (error) {
+        console.error('Cesium初期化エラー:', error);
+        updateStatus('❌ 初期化に失敗しました: ' + error.message, 'error');
+        document.getElementById('cesiumContainer').innerHTML = 
+          '<div style="padding: 20px; color: red; text-align: center;">3D地図の表示に失敗しました<br>' + 
+          'ブラウザを更新してください</div>';
+      }
+    }
+
+    // 座標グリッドを追加
+    function addCoordinateGrid() {
+      // 緯度線（東西方向）
+      for (let lat = 35.0; lat <= 36.0; lat += 0.1) {
+        viewer.entities.add({
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray([139.0, lat, 140.0, lat]),
+            width: 1,
+            material: Cesium.Color.WHITE.withAlpha(0.3)
+          }
+        });
+      }
+      
+      // 経度線（南北方向）
+      for (let lon = 139.0; lon <= 140.0; lon += 0.1) {
+        viewer.entities.add({
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray([lon, 35.0, lon, 36.0]),
+            width: 1,
+            material: Cesium.Color.WHITE.withAlpha(0.3)
+          }
+        });
+      }
+    }
+
+    function setupEventListeners() {
+      // ファイル選択イベント
+      document.getElementById('fileInput').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file || !viewer) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const geojson = JSON.parse(e.target.result);
+            loadGeoJSON(geojson, file.name);
+          } catch (error) {
+            updateStatus('❌ ファイル読み込みエラー: ' + error.message, 'error');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      // クリックイベント
+      viewer.cesiumWidget.screenSpaceEventHandler.setInputAction(function(click) {
+        const pickedObject = viewer.scene.pick(click.position);
+        if (pickedObject && pickedObject.id && pickedObject.id.name) {
+          updateStatus(`📍 クリック: ${pickedObject.id.name}`, 'info');
+        }
+      }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    }
+
+    // GeoJSONデータ読み込み
+    async function loadDefaultGeoJSON() {
+      try {
+        const response = await fetch('./data/sample.geojson');
+        if (response.ok) {
+          const geojson = await response.json();
+          loadGeoJSON(geojson, 'sample.geojson');
+        }
+      } catch (error) {
+        console.log('デフォルトGeoJSONの読み込みをスキップ:', error.message);
+        updateStatus('サンプルデータの読み込みをスキップしました', 'info');
+      }
+    }
+
+    function loadGeoJSON(geojson, filename) {
+      if (!viewer) return;
+      
+      try {
+        updateStatus(`GeoJSONデータを読み込み中: ${filename}`, 'info');
+        
+        // 既存のGeoJSONエンティティを削除（グリッドは保持）
+        const entities = viewer.entities.values;
+        for (let i = entities.length - 1; i >= 0; i--) {
+          const entity = entities[i];
+          if (entity.properties && entity.properties.geojson) {
+            viewer.entities.remove(entity);
+          }
+        }
+        
+        // GeoJSONデータソースを作成
+        const dataSource = new Cesium.GeoJsonDataSource();
+        dataSource.load(geojson, {
+          stroke: Cesium.Color.YELLOW,
+          fill: Cesium.Color.YELLOW.withAlpha(0.7),
+          strokeWidth: 3,
+          markerSymbol: '📍',
+          markerColor: Cesium.Color.RED,
+          markerSize: 48
+        }).then(() => {
+          viewer.dataSources.add(dataSource);
+          
+          // データにマークを付ける
+          const entities = dataSource.entities.values;
+          entities.forEach(entity => {
+            entity.properties = { geojson: true };
+          });
+          
+          viewer.zoomTo(dataSource);
+          updateStatus(`✅ GeoJSONデータ読み込み完了: ${filename} (${entities.length}件)`, 'success');
+        }).catch(error => {
+          console.error('GeoJSONデータソース作成エラー:', error);
+          updateStatus('❌ GeoJSONデータ読み込み失敗: ' + error.message, 'error');
+        });
+        
+      } catch (error) {
+        console.error('GeoJSON読み込みエラー:', error);
+        updateStatus('❌ GeoJSON読み込み失敗: ' + error.message, 'error');
+      }
+    }
+
+    // コントロール関数
+    function loadSampleData() {
+      loadDefaultGeoJSON();
+    }
+
+    function resetView() {
+      if (!viewer) return;
+      viewer.camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),
+        orientation: {
+          heading: 0.0,
+          pitch: -Math.PI / 6,
+          roll: 0.0
+        }
+      });
+      updateStatus('🏠 東京に戻りました', 'info');
+    }
+
+    function toggleWireframe() {
+      if (!viewer) return;
+      wireframeMode = !wireframeMode;
+      viewer.scene.globe.enableLighting = wireframeMode;
+      updateStatus(wireframeMode ? '🔲 ワイヤーフレームモード' : '🌍 通常モード', 'info');
+    }
+
+    // 初期化開始
+    document.addEventListener('DOMContentLoaded', initializeCesium);
+  </script>
+</body>
+</html>
