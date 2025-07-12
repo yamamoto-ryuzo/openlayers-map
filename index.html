@@ -20,6 +20,9 @@
   <div id="cesiumContainer"></div>
   
   <script>
+    // Cesium Ion を無効化してOpenStreetMapのみ使用
+    Cesium.Ion.defaultAccessToken = '';
+    
     const statusDiv = document.getElementById('status');
     let viewer = null;
     
@@ -31,11 +34,25 @@
     // 段階的初期化
     async function initializeCesium() {
       updateStatus('Cesiumビューワーを初期化中...');
+      console.log('Cesium初期化開始 - URL:', window.location.href);
+      console.log('Cesium Ion Token:', Cesium.Ion.defaultAccessToken);
       
       try {
-        // 最もシンプルな設定で開始
+        updateStatus('OpenStreetMapプロバイダーを作成中...');
+        
+        // OpenStreetMapを直接imageryProviderとして設定
+        const osmProvider = new Cesium.UrlTemplateImageryProvider({
+          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+          subdomains: ['a', 'b', 'c'],
+          maximumLevel: 18,
+          credit: 'Map data © OpenStreetMap contributors'
+        });
+
+        console.log('OSMプロバイダー作成完了');
+        updateStatus('Cesiumビューワーを作成中...');
+
         viewer = new Cesium.Viewer('cesiumContainer', {
-          imageryProvider: false,
+          imageryProvider: osmProvider,
           baseLayerPicker: false,
           vrButton: false,
           geocoder: false,
@@ -47,44 +64,22 @@
           fullscreenButton: true
         });
 
-        updateStatus('ビューワー作成完了。背景地図を設定中...');
+        console.log('Cesiumビューワー作成完了');
+        updateStatus('✅ OpenStreetMapで初期化完了！東京に移動中...');
 
-        // 背景を一時的に単色に設定
-        viewer.scene.globe.show = false;
-        viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
+        // 東京を中心に設定
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
+        });
 
-        // 少し待ってからOpenStreetMapを追加
-        setTimeout(() => {
-          try {
-            updateStatus('OpenStreetMapを読み込み中...');
-            
-            const osmProvider = new Cesium.UrlTemplateImageryProvider({
-              url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              maximumLevel: 18,
-              credit: 'Map data © OpenStreetMap contributors'
-            });
+        console.log('東京への移動完了');
+        updateStatus('✅ 3D地図表示完了！');
 
-            viewer.scene.globe.show = true;
-            viewer.scene.imageryLayers.addImageryProvider(osmProvider);
-            
-            updateStatus('OpenStreetMap読み込み完了！');
-
-            // 東京を中心に設定
-            viewer.camera.setView({
-              destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
-            });
-
-            // イベントリスナーを設定
-            setupEventListeners();
-            
-            // デフォルトGeoJSONを読み込み
-            loadDefaultGeoJSON();
-
-          } catch (osmError) {
-            console.error('OpenStreetMap読み込みエラー:', osmError);
-            updateStatus('OpenStreetMap読み込み失敗。基本表示で継続します。');
-          }
-        }, 1000);
+        // イベントリスナーを設定
+        setupEventListeners();
+        
+        // デフォルトGeoJSONを読み込み
+        loadDefaultGeoJSON();
 
       } catch (error) {
         console.error('Cesium初期化エラー:', error);
