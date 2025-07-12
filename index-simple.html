@@ -6,61 +6,6 @@
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <style>
-    body { margin: 0; padding: 20px; font-family: Arial, sans-serif; }
-    #cesiumContainer { width: 100%; height: 500px; border: 1px solid #333; }
-  </style>
-</head>
-<body>
-  <h1>🗺️ Simple Cesium Test</h1>
-  <div id="cesiumContainer"></div>
-
-  <script>
-    try {
-      // Cesium Ion トークンを無効化
-      Cesium.Ion.defaultAccessToken = '';
-      
-      console.log('Creating Cesium viewer...');
-      
-      const viewer = new Cesium.Viewer('cesiumContainer', {
-        imageryProvider: new Cesium.UrlTemplateImageryProvider({
-          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          subdomains: ['a', 'b', 'c'],
-          maximumLevel: 18,
-          credit: 'Map data © OpenStreetMap contributors'
-        }),
-        baseLayerPicker: false,
-        geocoder: false,
-        homeButton: false,
-        sceneModePicker: false,
-        navigationHelpButton: false,
-        animation: false,
-        timeline: false,
-        fullscreenButton: false,
-        vrButton: false
-      });
-
-      // 東京を表示
-      viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
-      });
-
-      console.log('Cesium viewer created successfully');
-
-    } catch (error) {
-      console.error('Error creating viewer:', error);
-      document.getElementById('cesiumContainer').innerHTML = 
-        '<div style="padding: 20px; color: red;">Cesiumの初期化に失敗しました: ' + error.message + '</div>';
-    }
-  </script>
-</body>
-</html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <title>Simple Cesium Test</title>
-  <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
-  <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
-  <style>
     html, body, #cesiumContainer {
       width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden;
     }
