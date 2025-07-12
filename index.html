@@ -132,8 +132,16 @@
     }
 
     function loadDefaultGeoJSON() {
-      fetch('./data/sample.geojson')
-        .then(response => response.json())
+      // GitHub Pages対応：相対パスで確実にアクセス
+      const geojsonPath = './data/sample.geojson';
+      
+      fetch(geojsonPath)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.json();
+        })
         .then(geojson => {
           if (!viewer) return;
           
