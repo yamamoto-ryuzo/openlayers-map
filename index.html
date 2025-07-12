@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>Cesium 3D GeoJSON Viewer</title>
+  <title>Cesium 3D GeoJSON Viewer - GitHub Pages版</title>
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
   <style>
@@ -11,11 +11,35 @@
     #cesiumContainer { width: 100%; height: 600px; display: block; border: 1px solid #ccc; }
     #fileInput { margin: 10px 0; }
     #status { margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 4px; }
+    .retry-button { 
+      margin: 10px 0; 
+      padding: 10px 20px; 
+      background: #007bff; 
+      color: white; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer; 
+    }
+    .retry-button:hover { background: #0056b3; }
   </style>
 </head>
 <body>
-  <h1>Cesium 3D GeoJSON Viewer</h1>
+  <h1>🌍 Cesium 3D GeoJSON Viewer (GitHub Pages版)</h1>
+  <div style="margin: 10px 0; padding: 10px; background: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
+    <strong>📍 動作確認済み:</strong> VS Codeローカル環境での動作を基にGitHub Pages用に最適化
+  </div>
+  <div style="margin: 10px 0; padding: 10px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px;">
+    <strong>⚠️ 重要な注意事項:</strong><br>
+    • 背景地図の読み込みには<strong>5-10秒間のタイムアウト</strong>が必要です<br>
+    • 初回表示時や遅いネットワークでは背景が遅れて表示される場合があります<br>
+    • 背景が表示されない場合は<strong>20-30秒</strong>お待ちください<br>
+    • GitHub Pagesの外部タイルサーバーアクセスには時間がかかる場合があります<br>
+    • ネットワークが遅い場合は、さらに時間がかかることがあります
+  </div>
   <div id="status">初期化中...</div>
+  <button class="retry-button" onclick="retryMapLoad()" style="display: none;" id="retryButton">
+    🔄 背景地図の再読み込み
+  </button>
   <input type="file" id="fileInput" accept=".geojson,.json" />
   <div id="cesiumContainer"></div>
   
@@ -53,38 +77,62 @@
         viewer.scene.globe.show = false;
         viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
 
-        // 少し待ってからOpenStreetMapを追加
+        // 段階的読み込み: まず基本的な地球を表示してから背景を追加
         setTimeout(() => {
-          try {
-            updateStatus('OpenStreetMapを読み込み中...');
-            
-            const osmProvider = new Cesium.UrlTemplateImageryProvider({
-              url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              maximumLevel: 18,
-              credit: 'Map data © OpenStreetMap contributors'
-            });
+          updateStatus('Step 1: 基本地球を表示中...');
+          viewer.scene.globe.show = true;
+          viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
+          
+          // さらに待ってからOpenStreetMapを追加
+          setTimeout(() => {
+            try {
+              updateStatus('Step 2: OpenStreetMapを読み込み中... (最大30秒かかる場合があります)');
+              
+              const osmProvider = new Cesium.UrlTemplateImageryProvider({
+                url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: ['a', 'b', 'c'],
+                maximumLevel: 19,
+                minimumLevel: 0,
+                credit: 'Map data © OpenStreetMap contributors',
+                enablePickFeatures: false
+              });
 
-            viewer.scene.globe.show = true;
-            viewer.scene.imageryLayers.addImageryProvider(osmProvider);
-            
-            updateStatus('OpenStreetMap読み込み完了！');
+              viewer.scene.imageryLayers.addImageryProvider(osmProvider);
+              
+              updateStatus('Step 3: OpenStreetMap追加完了。タイル読み込み中...');
 
-            // 東京を中心に設定
-            viewer.camera.setView({
-              destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
-            });
+              // 東京を中心に設定（より詳細な設定）
+              viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),
+                orientation: {
+                  heading: 0.0,
+                  pitch: -Math.PI / 4,  // 45度下向き
+                  roll: 0.0
+                }
+              });
 
-            // イベントリスナーを設定
-            setupEventListeners();
-            
-            // デフォルトGeoJSONを読み込み
-            loadDefaultGeoJSON();
+              // イベントリスナーを設定
+              setupEventListeners();
+              
+              // タイル読み込み監視を追加
+              monitorTileLoading();
+              
+              // さらに時間をおいてデフォルトGeoJSONを読み込み
+              setTimeout(() => {
+                loadDefaultGeoJSON();
+              }, 2000);
 
-          } catch (osmError) {
-            console.error('OpenStreetMap読み込みエラー:', osmError);
-            updateStatus('OpenStreetMap読み込み失敗。基本表示で継続します。');
-          }
-        }, 1000);
+            } catch (osmError) {
+              console.error('OpenStreetMap読み込みエラー:', osmError);
+              updateStatus('OpenStreetMap読み込み失敗。基本表示で継続します。');
+              
+              // フォールバック: 基本表示でも操作可能にする
+              setupEventListeners();
+              loadDefaultGeoJSON();
+            }
+          }, 5000);  // 5秒待機してからOpenStreetMap読み込み
+          
+        }, 2000);  // まず2秒待機してから基本地球表示
 
       } catch (error) {
         console.error('Cesium初期化エラー:', error);
@@ -92,6 +140,64 @@
         document.getElementById('cesiumContainer').innerHTML = 
           '<div style="padding: 20px; color: red; text-align: center;">3D地図の表示に失敗しました<br>' + 
           'ブラウザを更新するか、index2d.htmlを試してください</div>';
+      }
+    }
+
+    // タイル読み込み監視
+    function monitorTileLoading() {
+      if (!viewer || !viewer.scene || !viewer.scene.globe) return;
+
+      let tileLoadCount = 0;
+      const startTime = Date.now();
+
+      const checkTiles = setInterval(() => {
+        const tilesLoaded = viewer.scene.globe.tilesLoaded;
+        if (tilesLoaded) {
+          tileLoadCount++;
+          const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+          updateStatus(`✅ OpenStreetMapタイル読み込み完了！ (${elapsed}秒)`);
+          clearInterval(checkTiles);
+        }
+      }, 500);
+
+      // 30秒でタイムアウト警告とリトライボタン表示
+      setTimeout(() => {
+        clearInterval(checkTiles);
+        if (tileLoadCount === 0) {
+          updateStatus('⚠️ タイル読み込みが遅れています。下のボタンで再試行してください。');
+          document.getElementById('retryButton').style.display = 'block';
+        }
+      }, 30000);
+    }
+
+    // 背景地図の再読み込み機能
+    function retryMapLoad() {
+      updateStatus('背景地図を再読み込み中...');
+      document.getElementById('retryButton').style.display = 'none';
+      
+      if (viewer && viewer.scene && viewer.scene.imageryLayers) {
+        viewer.scene.imageryLayers.removeAll();
+        
+        setTimeout(() => {
+          try {
+            const osmProvider = new Cesium.UrlTemplateImageryProvider({
+              url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: ['a', 'b', 'c'],
+              maximumLevel: 19,
+              minimumLevel: 0,
+              credit: 'Map data © OpenStreetMap contributors',
+              enablePickFeatures: false
+            });
+
+            viewer.scene.imageryLayers.addImageryProvider(osmProvider);
+            updateStatus('背景地図を再読み込みしました。タイル読み込み中...');
+            monitorTileLoading();
+            
+          } catch (error) {
+            updateStatus('再読み込みに失敗しました: ' + error.message);
+            document.getElementById('retryButton').style.display = 'block';
+          }
+        }, 1000);
       }
     }
 
