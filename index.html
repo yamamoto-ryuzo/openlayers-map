@@ -20,8 +20,11 @@
   <div id="cesiumContainer"></div>
   
   <script>
-    // Cesium Ion トークンを無効化（OpenStreetMapを使用するため）
-    Cesium.Ion.defaultAccessToken = '';
+    // Cesium Ion トークンの設定
+    // デフォルトトークンがある場合は使用、なければOpenStreetMapを使用
+    if (!Cesium.Ion.defaultAccessToken || Cesium.Ion.defaultAccessToken === '') {
+      console.log('Cesium Ion token not available, will use OpenStreetMap');
+    }
     
     const statusDiv = document.getElementById('status');
     let viewer = null;
@@ -36,28 +39,65 @@
       updateStatus('Cesiumビューワーを初期化中...');
       
       try {
-        // 最もシンプルな設定で開始
-        viewer = new Cesium.Viewer('cesiumContainer', {
-          imageryProvider: new Cesium.UrlTemplateImageryProvider({
-            url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            subdomains: ['a', 'b', 'c'],
-            maximumLevel: 18,
-            credit: 'Map data © OpenStreetMap contributors'
-          }),
-          baseLayerPicker: false,
-          vrButton: false,
-          geocoder: false,
-          homeButton: true,
-          sceneModePicker: false,
-          navigationHelpButton: false,
-          animation: false,
-          timeline: false,
-          fullscreenButton: true
-        });
+        // デフォルト背景を試してみる
+        updateStatus('デフォルト背景で初期化を試行中...');
+        
+        try {
+          // まずCesium Ionのデフォルト設定で試す
+          if (Cesium.Ion.defaultAccessToken) {
+            viewer = new Cesium.Viewer('cesiumContainer', {
+              baseLayerPicker: true,
+              vrButton: false,
+              geocoder: false,
+              homeButton: true,
+              sceneModePicker: false,
+              navigationHelpButton: false,
+              animation: false,
+              timeline: false,
+              fullscreenButton: true
+            });
+            updateStatus('✅ デフォルト背景で初期化成功！');
+          } else {
+            throw new Error('Cesium Ion token not available');
+          }
+        } catch (ionError) {
+          console.log('Cesium Ion利用不可、OpenStreetMapで初期化します:', ionError.message);
+          updateStatus('OpenStreetMapで初期化中...');
+          
+          // OpenStreetMapで初期化
+          viewer = new Cesium.Viewer('cesiumContainer', {
+            imageryProvider: new Cesium.UrlTemplateImageryProvider({
+              url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: ['a', 'b', 'c'],
+              maximumLevel: 18,
+              credit: 'Map data © OpenStreetMap contributors'
+            }),
+            baseLayerPicker: false,
+            vrButton: false,
+            geocoder: false,
+            homeButton: true,
+            sceneModePicker: false,
+            navigationHelpButton: false,
+            animation: false,
+            timeline: false,
+            fullscreenButton: true
+          });
+          updateStatus('✅ OpenStreetMapで初期化成功！');
+        }
 
         updateStatus('ビューワー作成完了。東京に移動中...');
 
         // 東京を中心に設定
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
+        });
+
+        updateStatus('✅ Cesiumマップ表示完了！');
+
+        // イベントリスナーを設定
+        setupEventListeners();
+        
+        // デフォルトGeoJSONを読み込み
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
         });
