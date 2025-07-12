@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Cesium with CartoDB</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #cesiumContainer {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #333;
+            background: #f0f0f0;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🗺️ 最小構成Cesium (CartoDB背景)</h1>
+    <div id="status">初期化中...</div>
+    <div id="cesiumContainer"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+
+        function updateStatus(message) {
+            statusDiv.textContent = message;
+            console.log(message);
+        }
+
+        // Cesium Ion を無効化
+        Cesium.Ion.defaultAccessToken = '';
+
+        try {
+            updateStatus('CartoDB Positronで初期化中...');
+
+            // CartoDB Positronを使用（軽量で確実）
+            const imageryProvider = new Cesium.UrlTemplateImageryProvider({
+                url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                subdomains: ['a', 'b', 'c', 'd'],
+                maximumLevel: 18,
+                credit: '© CartoDB © OpenStreetMap contributors'
+            });
+
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                imageryProvider: imageryProvider,
+                baseLayerPicker: false,
+                geocoder: false,
+                homeButton: false,
+                sceneModePicker: false,
+                navigationHelpButton: false,
+                animation: false,
+                timeline: false,
+                fullscreenButton: false,
+                vrButton: false
+            });
+
+            updateStatus('✅ 初期化完了！東京に移動中...');
+
+            // 東京を表示
+            viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
+            });
+
+            updateStatus('✅ CartoDB背景の3D地図表示完了！');
+
+        } catch (error) {
+            updateStatus('❌ 初期化エラー: ' + error.message);
+            console.error('Error:', error);
+            
+            document.getElementById('cesiumContainer').innerHTML = 
+                '<div style="padding: 20px; color: red; text-align: center;">初期化に失敗しました<br>' + error.message + '</div>';
+        }
+    </script>
+</body>
+</html>

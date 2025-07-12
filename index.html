@@ -31,55 +31,108 @@
       console.log(message);
     }
 
-    // 段階的初期化
+    // 段階的初期化 - 複数のフォールバック戦略
     async function initializeCesium() {
       updateStatus('Cesiumビューワーを初期化中...');
       console.log('Cesium初期化開始 - URL:', window.location.href);
       console.log('Cesium Ion Token:', Cesium.Ion.defaultAccessToken);
       
       try {
-        updateStatus('OpenStreetMapプロバイダーを作成中...');
-        
-        // OpenStreetMapを直接imageryProviderとして設定
-        const osmProvider = new Cesium.UrlTemplateImageryProvider({
-          url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-          subdomains: ['a', 'b', 'c'],
-          maximumLevel: 18,
-          credit: 'Map data © OpenStreetMap contributors'
-        });
+        // タイルサーバーの優先順位リスト
+        const tileProviders = [
+          {
+            name: 'OpenStreetMap (subdomain)',
+            config: {
+              url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: ['a', 'b', 'c'],
+              maximumLevel: 18,
+              credit: 'Map data © OpenStreetMap contributors'
+            }
+          },
+          {
+            name: 'OpenStreetMap (direct)',
+            config: {
+              url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              maximumLevel: 18,
+              credit: 'Map data © OpenStreetMap contributors'
+            }
+          },
+          {
+            name: 'CartoDB Positron',
+            config: {
+              url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              subdomains: ['a', 'b', 'c', 'd'],
+              maximumLevel: 18,
+              credit: '© CartoDB © OpenStreetMap contributors'
+            }
+          }
+        ];
 
-        console.log('OSMプロバイダー作成完了');
-        updateStatus('Cesiumビューワーを作成中...');
+        for (let i = 0; i < tileProviders.length; i++) {
+          const provider = tileProviders[i];
+          
+          try {
+            updateStatus(`${provider.name}を試行中...`);
+            console.log(`Trying provider: ${provider.name}`);
+            
+            const imageryProvider = new Cesium.UrlTemplateImageryProvider(provider.config);
 
-        viewer = new Cesium.Viewer('cesiumContainer', {
-          imageryProvider: osmProvider,
-          baseLayerPicker: false,
-          vrButton: false,
-          geocoder: false,
-          homeButton: true,
-          sceneModePicker: false,
-          navigationHelpButton: false,
-          animation: false,
-          timeline: false,
-          fullscreenButton: true
-        });
+            console.log('ImageryProvider created, creating viewer...');
+            updateStatus('Cesiumビューワーを作成中...');
 
-        console.log('Cesiumビューワー作成完了');
-        updateStatus('✅ OpenStreetMapで初期化完了！東京に移動中...');
+            viewer = new Cesium.Viewer('cesiumContainer', {
+              imageryProvider: imageryProvider,
+              baseLayerPicker: false,
+              vrButton: false,
+              geocoder: false,
+              homeButton: true,
+              sceneModePicker: false,
+              navigationHelpButton: false,
+              animation: false,
+              timeline: false,
+              fullscreenButton: true
+            });
 
-        // 東京を中心に設定
-        viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
-        });
+            console.log('Cesiumビューワー作成完了');
+            updateStatus(`✅ ${provider.name}で初期化完了！東京に移動中...`);
 
-        console.log('東京への移動完了');
-        updateStatus('✅ 3D地図表示完了！');
+            // 東京を中心に設定
+            viewer.camera.setView({
+              destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000)
+            });
 
-        // イベントリスナーを設定
-        setupEventListeners();
-        
-        // デフォルトGeoJSONを読み込み
-        loadDefaultGeoJSON();
+            console.log('東京への移動完了');
+            updateStatus(`✅ 3D地図表示完了！(${provider.name})`);
+
+            // イベントリスナーを設定
+            setupEventListeners();
+            
+            // デフォルトGeoJSONを読み込み
+            loadDefaultGeoJSON();
+            
+            // 成功したらループを抜ける
+            return;
+            
+          } catch (providerError) {
+            console.error(`${provider.name} failed:`, providerError);
+            updateStatus(`${provider.name} 失敗、次を試行中...`);
+            
+            // viewerが作成されていたら破棄
+            if (viewer) {
+              try {
+                viewer.destroy();
+                viewer = null;
+              } catch (destroyError) {
+                console.error('Viewer destroy error:', destroyError);
+              }
+            }
+            
+            // 最後のプロバイダーでも失敗した場合
+            if (i === tileProviders.length - 1) {
+              throw new Error('すべてのタイルプロバイダーで初期化に失敗しました');
+            }
+          }
+        }
 
       } catch (error) {
         console.error('Cesium初期化エラー:', error);
