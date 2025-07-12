@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL & Cesium Environment Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .test-section {
+            background: white;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        #cesiumContainer {
+            width: 100%;
+            height: 400px;
+            border: 2px solid #333;
+            background: #87CEEB;
+            margin: 20px 0;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 WebGL & Cesium 環境テスト</h1>
+        
+        <div class="test-section">
+            <h2>1. 基本環境情報</h2>
+            <div id="envInfo"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. WebGL サポート確認</h2>
+            <div id="webglTest"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Cesium 初期化テスト</h2>
+            <div id="cesiumTest"></div>
+            <div id="cesiumContainer"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. ネットワーク接続テスト</h2>
+            <div id="networkTest"></div>
+        </div>
+    </div>
+
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+    <script>
+        function addStatus(containerId, message, type = 'info') {
+            const container = document.getElementById(containerId);
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            container.appendChild(div);
+            console.log(`[${containerId}] ${message}`);
+        }
+
+        // 1. 基本環境情報
+        function testEnvironment() {
+            const envInfo = document.getElementById('envInfo');
+            
+            const info = {
+                'URL': window.location.href,
+                'Protocol': window.location.protocol,
+                'User Agent': navigator.userAgent,
+                'Platform': navigator.platform,
+                'Language': navigator.language,
+                'Cookies Enabled': navigator.cookieEnabled,
+                'Online': navigator.onLine,
+                'Viewport': `${window.innerWidth}x${window.innerHeight}`,
+                'Screen': `${screen.width}x${screen.height}`
+            };
+
+            const pre = document.createElement('pre');
+            pre.textContent = JSON.stringify(info, null, 2);
+            envInfo.appendChild(pre);
+        }
+
+        // 2. WebGL テスト
+        function testWebGL() {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                
+                if (!gl) {
+                    addStatus('webglTest', '❌ WebGL がサポートされていません', 'error');
+                    return false;
+                }
+
+                addStatus('webglTest', '✅ WebGL サポートを確認', 'success');
+                
+                const info = {
+                    'Vendor': gl.getParameter(gl.VENDOR),
+                    'Renderer': gl.getParameter(gl.RENDERER),
+                    'Version': gl.getParameter(gl.VERSION),
+                    'Shading Language': gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+                    'Max Texture Size': gl.getParameter(gl.MAX_TEXTURE_SIZE),
+                    'Max Viewport': gl.getParameter(gl.MAX_VIEWPORT_DIMS).join('x')
+                };
+
+                const pre = document.createElement('pre');
+                pre.textContent = JSON.stringify(info, null, 2);
+                document.getElementById('webglTest').appendChild(pre);
+                
+                return true;
+            } catch (error) {
+                addStatus('webglTest', '❌ WebGL テストエラー: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // 3. Cesium テスト
+        function testCesium() {
+            try {
+                addStatus('cesiumTest', 'Cesium バージョン: ' + Cesium.VERSION, 'info');
+                
+                // Cesium Ion を無効化
+                Cesium.Ion.defaultAccessToken = '';
+                addStatus('cesiumTest', 'Cesium Ion を無効化', 'info');
+
+                addStatus('cesiumTest', 'Cesium ビューワーを作成中...', 'info');
+
+                const viewer = new Cesium.Viewer('cesiumContainer', {
+                    imageryProvider: false,
+                    terrainProvider: false,
+                    skyBox: false,
+                    skyAtmosphere: false,
+                    baseLayerPicker: false,
+                    geocoder: false,
+                    homeButton: false,
+                    sceneModePicker: false,
+                    navigationHelpButton: false,
+                    animation: false,
+                    timeline: false,
+                    fullscreenButton: false,
+                    vrButton: false
+                });
+
+                viewer.scene.backgroundColor = Cesium.Color.LIGHTSKYBLUE;
+                viewer.scene.globe.show = false;
+
+                addStatus('cesiumTest', '✅ Cesium ビューワー作成成功！', 'success');
+
+                // 簡単なエンティティを追加
+                viewer.entities.add({
+                    position: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 1000),
+                    box: {
+                        dimensions: new Cesium.Cartesian3(1000, 1000, 1000),
+                        material: Cesium.Color.RED.withAlpha(0.8)
+                    }
+                });
+
+                viewer.camera.setView({
+                    destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 10000)
+                });
+
+                addStatus('cesiumTest', '✅ 3D オブジェクトを表示中（赤いボックス）', 'success');
+
+            } catch (error) {
+                addStatus('cesiumTest', '❌ Cesium エラー: ' + error.message, 'error');
+                console.error('Cesium Error:', error);
+            }
+        }
+
+        // 4. ネットワークテスト
+        async function testNetwork() {
+            const urls = [
+                'https://tile.openstreetmap.org/0/0/0.png',
+                'https://a.basemaps.cartocdn.com/light_all/0/0/0.png',
+                'https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js'
+            ];
+
+            for (const url of urls) {
+                try {
+                    const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+                    addStatus('networkTest', `✅ アクセス可能: ${url}`, 'success');
+                } catch (error) {
+                    addStatus('networkTest', `❌ アクセス不可: ${url}`, 'warning');
+                }
+            }
+        }
+
+        // テスト実行
+        document.addEventListener('DOMContentLoaded', function() {
+            testEnvironment();
+            
+            const webglSupported = testWebGL();
+            
+            if (webglSupported) {
+                testCesium();
+            } else {
+                addStatus('cesiumTest', '❌ WebGL が利用できないため Cesium テストをスキップ', 'error');
+            }
+            
+            testNetwork();
+        });
+    </script>
+</body>
+</html>

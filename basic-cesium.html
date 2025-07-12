@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basic Cesium - No External Tiles</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.115/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        #cesiumContainer {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #333;
+            background: #87CEEB;
+        }
+        #status {
+            padding: 15px;
+            margin: 10px 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🌍 最基本Cesium（外部タイル不使用）</h1>
+    <div id="status" class="info">初期化中...</div>
+    <div id="cesiumContainer"></div>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+
+        function updateStatus(message, type = 'info') {
+            statusDiv.textContent = message;
+            statusDiv.className = type;
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+        }
+
+        // 環境情報
+        updateStatus('環境確認中...', 'info');
+        console.log('URL:', window.location.href);
+        console.log('Protocol:', window.location.protocol);
+        console.log('Cesium version:', Cesium.VERSION);
+
+        try {
+            // Cesium Ion を完全に無効化
+            Cesium.Ion.defaultAccessToken = '';
+            console.log('Cesium Ion disabled');
+
+            updateStatus('Cesiumビューワーを作成中（背景なし）...', 'info');
+
+            // 外部タイルを一切使わない最小構成
+            const viewer = new Cesium.Viewer('cesiumContainer', {
+                imageryProvider: false,  // 背景画像を無効化
+                terrainProvider: false,  // 地形を無効化
+                skyBox: false,          // スカイボックスを無効化
+                skyAtmosphere: false,   // 大気を無効化
+                baseLayerPicker: false,
+                geocoder: false,
+                homeButton: true,
+                sceneModePicker: false,
+                navigationHelpButton: false,
+                animation: false,
+                timeline: false,
+                fullscreenButton: false,
+                vrButton: false
+            });
+
+            // 背景色を設定
+            viewer.scene.backgroundColor = Cesium.Color.LIGHTSTEELBLUE;
+            viewer.scene.globe.show = false;  // 地球を非表示
+
+            updateStatus('✅ ビューワー作成完了！', 'success');
+
+            // 東京上空に移動
+            viewer.camera.setView({
+                destination: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 50000),
+                orientation: {
+                    heading: 0.0,
+                    pitch: -Math.PI / 4,  // 45度下向き
+                    roll: 0.0
+                }
+            });
+
+            updateStatus('✅ 基本表示完了！（青い背景で3D空間を表示）', 'success');
+
+            // 簡単なポイントを追加してテスト
+            viewer.entities.add({
+                name: '東京駅',
+                position: Cesium.Cartesian3.fromDegrees(139.767, 35.681, 0),
+                point: {
+                    pixelSize: 20,
+                    color: Cesium.Color.YELLOW,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 2,
+                    heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+                },
+                label: {
+                    text: '東京駅',
+                    font: '16pt sans-serif',
+                    fillColor: Cesium.Color.WHITE,
+                    outlineColor: Cesium.Color.BLACK,
+                    outlineWidth: 2,
+                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                    pixelOffset: new Cesium.Cartesian2(0, -50)
+                }
+            });
+
+            updateStatus('✅ 完了！東京駅マーカーを表示中', 'success');
+
+            // クリックイベント
+            viewer.cesiumWidget.screenSpaceEventHandler.setInputAction(function(click) {
+                const pickedObject = viewer.scene.pick(click.position);
+                if (pickedObject && pickedObject.id) {
+                    updateStatus(`クリック: ${pickedObject.id.name}`, 'info');
+                }
+            }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+        } catch (error) {
+            updateStatus('❌ エラー: ' + error.message, 'error');
+            console.error('詳細エラー:', error);
+            
+            document.getElementById('cesiumContainer').innerHTML = 
+                `<div style="padding: 40px; text-align: center; color: #721c24;">
+                    <h3>初期化エラー</h3>
+                    <p>${error.message}</p>
+                    <p><small>ブラウザの開発者ツールでコンソールを確認してください</small></p>
+                </div>`;
+        }
+    </script>
+</body>
+</html>
